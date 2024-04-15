@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guitar Tuner</title>
+    <style>
+        body{
+            font-family: Arial, Helvetica, sans-serif;
+            text-align: center;
+            background: linear-gradient();
+        }
+        h1{
+            margin-top: 50px;
+        }
+        #note{
+            font-size: 24px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Guitar Tuner</h1>
+    <p>Play a note on your guitar</p>
+    <div id="note"></div>
+    <script>
+      
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const analyser = audioContext.createAnalyser();
+  analyser.fftSize = 2048;
+  const bufferLength = analyser.frequencyBinCount;
+  const dataArray = new Uint8Array(bufferLength);
+
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(stream => {
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      setInterval(() => {
+        analyser.getByteTimeDomainData(dataArray);
+        const rms = Math.sqrt(dataArray.reduce((acc, val) => acc + val * val, 0) / bufferLength);
+        const isMakingSound = rms > 0.01;
+
+        if (isMakingSound) {
+          const frequency = getPitch(dataArray, audioContext.sampleRate);
+          const note = getNoteName(frequency);
+          document.getElementById('note').innerText = note;
+        } else {
+          document.getElementById('note').innerText = '';
+        }
+      }, 100);
+    })
+    .catch(err => console.error('Error: ', err));
+
+  function getPitch(dataArray, sampleRate) {
+    const peak = Math.max(...dataArray);
+    const threshold = 0.35 * peak;
+    let i = 0;
+    while (dataArray[i] < threshold) {
+      i++;
+    }
+    const zeroCrossing1 = i;
+    while (dataArray[i] > threshold) {
+      i++;
+    }
+    const zeroCrossing2 = i;
+    const zeroCrossingDiff = zeroCrossing2 - zeroCrossing1;
+    const pitch = sampleRate / zeroCrossingDiff;
+    return pitch;
+  }
+
+  function getNoteName(frequency) {
+    const notes = [
+      { name: 'E', frequency: 329.63 },
+      { name: 'A', frequency: 440 },
+      { name: 'D', frequency: 587.33 },
+      { name: 'G', frequency: 783.99 },
+      { name: 'B', frequency: 987.77 },
+      { name: 'e', frequency: 1318.51 }
+    ];
+    let closestNote = null;
+    let minDiff = Infinity;
+    for (const note of notes) {
+      const diff = Math.abs(frequency - note.frequency);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestNote = note;
+      }
+    }
+    return closestNote.name;
+  }   
+
+    </script>
+</body>
+</html>
